@@ -33,6 +33,11 @@ void ST_UploadFile(const char[] stagingPath, const char[] gokzMode, const char[]
 	char apiKey[ST_MAX_KEY_LENGTH];
 	gCV_Key.GetString(apiKey, sizeof(apiKey));
 
+	if (gCV_Debug.BoolValue && apiKey[0] == '\0')
+	{
+		LogMessage("[stratosphere] gokz_stratosphere_key is EMPTY; uploads will be rejected with 401.");
+	}
+
 	Handle hRequest = SteamWorks_CreateHTTPRequest(k_EHTTPMethodPOST, url);
 	if (hRequest == null)
 	{
@@ -72,7 +77,8 @@ void ST_UploadFile(const char[] stagingPath, const char[] gokzMode, const char[]
 
 	if (gCV_Debug.BoolValue)
 	{
-		LogMessage("[stratosphere] Uploading -> wr/%s/%s/%s.replay (timeMs=%d)", gokzMode, map, typeStr, timeMs);
+		LogMessage("[stratosphere] Uploading -> wr/%s/%s/%s.replay (timeMs=%d, apiKey=%s)",
+			gokzMode, map, typeStr, timeMs, apiKey[0] == '\0' ? "NOT_SET" : "set");
 	}
 
 	if (!SteamWorks_SendHTTPRequest(hRequest))
@@ -105,6 +111,14 @@ public void ST_OnUploadCompleted(Handle hRequest, bool bFailure, bool bRequestSu
 	{
 		LogError("[stratosphere] Upload failed: key=%s failure=%d successful=%d status=%d",
 			cacheKey, bFailure ? 1 : 0, bRequestSuccessful ? 1 : 0, code);
+		if (code == 401)
+		{
+			LogError("[stratosphere]   -> 401: gokz_stratosphere_key 与 Worker 的 API_KEY 不一致，或 Cloudflare 端未配置 API_KEY 变量。");
+		}
+		else if (code == 400)
+		{
+			LogError("[stratosphere]   -> 400: 请求头缺失或非法（X-GOKZ-Mode/X-Map/X-Route），检查 Worker 协议。");
+		}
 	}
 	else
 	{
@@ -123,3 +137,9 @@ public void ST_OnUploadCompleted(Handle hRequest, bool bFailure, bool bRequestSu
 	}
 	delete hRequest;
 }
+curl -X POST https://cngokzreplay.iquankz.cn/ \
+     -H "X-API-Key: ZJGQWBHJBADA" \
+     -H "X-GOKZ-Mode: vnl" \
+     -H "X-Map: kz_baxter" \
+     -H "X-Route: tp" \
+     -X POST --data-binary @addons/sourcemod/data/gokz-replays/_runs/kz_baxter/0_VNL_NRM_NUB.replay

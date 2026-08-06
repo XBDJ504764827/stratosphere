@@ -57,12 +57,7 @@ void ST_CacheWrite(const char[] cacheKey, int timeMs)
 // 同步复制录像到暂存目录，返回暂存路径；失败返回 false
 bool ST_StageFile(const char[] sourcePath, const char[] cacheKey, char[] stagingPath, int maxlength)
 {
-	char dir[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, dir, sizeof(dir), "%s", ST_STAGING_DIRECTORY);
-	if (!DirExists(dir))
-	{
-		CreateDirectory(dir, 511);
-	}
+	ST_EnsureStagingDir();
 
 	gI_StageCounter++;
 	char safeKey[ST_MAX_KEY_LENGTH];
@@ -108,6 +103,22 @@ static void ST_EnsureDataDir()
 {
 	char dir[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, dir, sizeof(dir), "%s", ST_DATA_DIRECTORY);
+	if (!DirExists(dir))
+	{
+		CreateDirectory(dir, 511);
+	}
+}
+
+// CreateDirectory 不创建中间目录，必须逐级创建
+static void ST_EnsureStagingDir()
+{
+	char dir[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, dir, sizeof(dir), "%s", ST_DATA_DIRECTORY);
+	if (!DirExists(dir))
+	{
+		CreateDirectory(dir, 511);
+	}
+	BuildPath(Path_SM, dir, sizeof(dir), "%s", ST_STAGING_DIRECTORY);
 	if (!DirExists(dir))
 	{
 		CreateDirectory(dir, 511);

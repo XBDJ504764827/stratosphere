@@ -263,17 +263,64 @@ static bool ST_SkipString(File file)
 
 // =====[ FILE ]=====
 
+// 解析录像源路径：兼容三种形式
+//   1. 绝对路径（当前 gokz 用 BuildPath(Path_SM) 生成）
+//   2. 相对游戏目录（旧版 gokz 以 "addons/sourcemod/data/..." 传入 forward）
+//   3. 相对 SourceMod 目录（"data/gokz-replays/..."）
+static bool ST_ResolveSourcePath(const char[] source, char[] output, int maxlength)
+{
+	// 绝对路径（Unix '/' 或 Windows 盘符）
+	if (source[0] == '/' || (source[1] == ':' && ((source[0] >= 'A' && source[0] <= 'Z') || (source[0] >= 'a' && source[0] <= 'z'))))
+	{
+		strcopy(output, maxlength, source);
+		return true;
+	}
+
+	// 以 "addons/..." 开头 = 相对游戏目录（csgo/），
+	// 游戏目录 = Path_SM 去掉末尾的 /addons/sourcemod（SM 1.11 无 Path_Game）
+	if (StrContains(source, "addons/") == 0)
+	{
+		char gameDir[PLATFORM_MAX_PATH];
+		BuildPath(Path_SM, gameDir, sizeof(gameDir), "");
+		int slashPos = StrContains(gameDir, "/addons/sourcemod");
+		if (slashPos == -1)
+		{
+			slashPos = StrContains(gameDir, "\\addons\\sourcemod"); // Windows
+		}
+		if (slashPos != -1)
+		{
+			gameDir[slashPos] = '\0';
+			Format(output, maxlength, "%s/%s", gameDir, source);
+		}
+		else
+		{
+			// 找不到则退回直接传原路径（OpenFile 默认按游戏目录解析）
+			strcopy(output, maxlength, source);
+		}
+		return true;
+	}
+
+	// 其余按相对 SourceMod 目录解析
+	BuildPath(Path_SM, output, maxlength, "%s", source);
+	return true;
+}
+
 // 二进制文件复制（shavit 风格，复制自 gokz-replays/nav.sp 的 File_Copy）
 bool ST_FileCopy(const char[] source, const char[] destination)
 {
-	File fileSource = OpenFile(source, "rb");
+	char resolvedSource[PLATFORM_MAX_PATH];
+	ST_ResolveSourcePath(source, resolvedSource, sizeof(resolvedSource));
+
+	File fileSource = OpenFile(resolvedSource, "rb");
 	if (fileSource == null)
 	{
+		LogError("[stratosphere] ST_FileCopy: cannot open source: %s", resolvedSource);
 		return false;
 	}
 	File fileDest = OpenFile(destination, "wb");
 	if (fileDest == null)
 	{
+		LogError("[stratosphere] ST_FileCopy: cannot open destination: %s", destination);
 		delete fileSource;
 		return false;
 	}
