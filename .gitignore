@@ -1,0 +1,30 @@
+# ===== 构建产物 =====
+*.smx
+*.smx.bak
+*.asm
+.sm111/
+
+# ===== 编译依赖（第三方 include，不提交仓库；build.sh 自动获取） =====
+addons/sourcemod/scripting/include/
+.deps/
+
+# ===== 服务器运行时数据（不提交） =====
+addons/sourcemod/data/
+addons/sourcemod/logs/
+addons/sourcemod/configs/
+addons/sourcemod/plugins/disabled/
+# 运行时生成的 gokz 配置不提交，但保留 stratosphere 默认模板
+cfg/sourcemod/gokz/*.cfg
+!cfg/sourcemod/gokz/gokz-stratosphere.cfg
+
+# ===== 编辑器 / 系统文件 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== 日志 =====
+*.log
