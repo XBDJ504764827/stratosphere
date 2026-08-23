@@ -84,10 +84,8 @@ jobs:
           PKG="package"
           rm -rf "$PKG" dist
           mkdir -p "$PKG/addons/sourcemod/plugins"
-          mkdir -p "$PKG/cfg_examples/sourcemod/gokz"
           mkdir -p dist
           cp addons/sourcemod/plugins/stratosphere.smx "$PKG/addons/sourcemod/plugins/"
-          cp cfg/sourcemod/gokz/gokz-stratosphere.cfg "$PKG/cfg_examples/sourcemod/gokz/gokz-stratosphere.cfg.example"
           ZIP="stratosphere-TEST-PR${PRNUM}-v${VER}-${SHORT}.zip"
           echo "Zip: $ZIP"
           (cd "$PKG" && zip -r "../dist/$ZIP" .)
