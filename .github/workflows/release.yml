@@ -52,8 +52,10 @@ jobs:
           echo "SM package: $url"
           curl -sL -o /tmp/sm.tar.gz "https://sm.alliedmods.net/smdrop/${SM_VERSION}/${url}"
           mkdir -p /tmp/sm
-          tar xzf /tmp/sm.tar.gz -C /tmp/sm --strip-components=1
-          /tmp/sm/addons/sourcemod/scripting/spcomp -h 2>&1 | head -n 20 || true
+          tar xzf /tmp/sm.tar.gz -C /tmp/sm
+          chmod +x /tmp/sm/addons/sourcemod/scripting/spcomp* || true
+          ls -lh /tmp/sm/addons/sourcemod/scripting/spcomp* 2>&1 | head -n 20
+          /tmp/sm/addons/sourcemod/scripting/spcomp64 -h 2>&1 | head -n 20 || true
 
       - name: Determine next version (auto bump patch)
         if: steps.check.outputs.skip == 'false'

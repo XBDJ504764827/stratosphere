@@ -137,9 +137,3 @@ public void ST_OnUploadCompleted(Handle hRequest, bool bFailure, bool bRequestSu
 	}
 	delete hRequest;
 }
-curl -X POST https://cngokzreplay.iquankz.cn/ \
-     -H "X-API-Key: ZJGQWBHJBADA" \
-     -H "X-GOKZ-Mode: vnl" \
-     -H "X-Map: kz_baxter" \
-     -H "X-Route: tp" \
-     -X POST --data-binary @addons/sourcemod/data/gokz-replays/_runs/kz_baxter/0_VNL_NRM_NUB.replay
