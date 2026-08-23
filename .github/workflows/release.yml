@@ -153,10 +153,10 @@ jobs:
           PKG="package"
           rm -rf "$PKG" dist
           mkdir -p "$PKG/addons/sourcemod/plugins"
-          mkdir -p "$PKG/cfg/sourcemod/gokz"
+          mkdir -p "$PKG/cfg_examples/sourcemod/gokz"
           mkdir -p dist
           cp addons/sourcemod/plugins/stratosphere.smx "$PKG/addons/sourcemod/plugins/"
-          cp cfg/sourcemod/gokz/gokz-stratosphere.cfg "$PKG/cfg/sourcemod/gokz/"
+          cp cfg/sourcemod/gokz/gokz-stratosphere.cfg "$PKG/cfg_examples/sourcemod/gokz/gokz-stratosphere.cfg.example"
           (cd "$PKG" && zip -r "../dist/stratosphere-${TAG}.zip" .)
           ls -lh dist/
           unzip -l "dist/stratosphere-${TAG}.zip"
