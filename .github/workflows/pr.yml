@@ -9,6 +9,7 @@ permissions:
 on:
   pull_request:
     branches: [ master, main ]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -76,16 +77,20 @@ jobs:
           unzip -l "dist/stratosphere-pr${{ github.event.number }}-${{ github.sha }}.zip"
 
       - name: Upload PR artifact (smx)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stratosphere-pr-${{ github.event.number }}-${{ github.sha }}
           path: |
             addons/sourcemod/plugins/stratosphere.smx
           retention-days: 14
+          if-no-files-found: warn
 
       - name: Upload PR artifact (full zip)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: stratosphere-full-pr-${{ github.event.number }}-${{ github.sha }}
           path: dist/*.zip
           retention-days: 14
+          if-no-files-found: warn
