@@ -62,7 +62,7 @@
 #pragma newdecls required
 #pragma semicolon 1
 
-#define ST_VERSION "1.0.0"
+#define ST_VERSION "1.0.1"
 
 public Plugin myinfo =
 {
