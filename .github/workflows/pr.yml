@@ -1,0 +1,91 @@
+name: PR Check
+
+env:
+  SM_VERSION: "1.11"
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SourceMod 1.11
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(curl -s https://sm.alliedmods.net/smdrop/${SM_VERSION}/ | grep -o 'sourcemod-1.11[^"]*-linux.tar.gz' | sort -V | tail -n1)"
+          echo "SM package: $url"
+          curl -sL -o /tmp/sm.tar.gz "https://sm.alliedmods.net/smdrop/${SM_VERSION}/${url}"
+          mkdir -p /tmp/sm
+          tar xzf /tmp/sm.tar.gz -C /tmp/sm
+          chmod +x /tmp/sm/addons/sourcemod/scripting/spcomp* || true
+          ls -lh /tmp/sm/addons/sourcemod/scripting/spcomp* 2>&1 | head -n 20
+          /tmp/sm/addons/sourcemod/scripting/spcomp64 -h 2>&1 | head -n 20 || true
+
+      - name: Fetch GOKZ include deps
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./build.sh deps
+
+      - name: Build (strict, -E warnings-as-errors)
+        shell: bash
+        run: |
+          set -euo pipefail
+          STRICT=1 SM_DIR=/tmp/sm ./build.sh
+
+      - name: Verify single smx
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh addons/sourcemod/plugins/stratosphere.smx
+          count="$(ls addons/sourcemod/plugins/*.smx 2>/dev/null | wc -l)"
+          if [ "$count" != "1" ]; then
+            echo "Expected exactly 1 smx, got $count"
+            ls -la addons/sourcemod/plugins/
+            exit 1
+          fi
+
+      - name: Package full install zip (PR test package)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG="package"
+          rm -rf "$PKG" dist
+          mkdir -p "$PKG/addons/sourcemod/plugins"
+          mkdir -p "$PKG/cfg/sourcemod/gokz"
+          mkdir -p dist
+          cp addons/sourcemod/plugins/stratosphere.smx "$PKG/addons/sourcemod/plugins/"
+          cp cfg/sourcemod/gokz/gokz-stratosphere.cfg "$PKG/cfg/sourcemod/gokz/"
+          # Keep directory structure so unzip to csgo/ is ready-to-use
+          (cd "$PKG" && zip -r "../dist/stratosphere-pr${{ github.event.number }}-${{ github.sha }}.zip" .)
+          ls -lh dist/
+          unzip -l "dist/stratosphere-pr${{ github.event.number }}-${{ github.sha }}.zip"
+
+      - name: Upload PR artifact (smx)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stratosphere-pr-${{ github.event.number }}-${{ github.sha }}
+          path: |
+            addons/sourcemod/plugins/stratosphere.smx
+          retention-days: 14
+
+      - name: Upload PR artifact (full zip)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stratosphere-full-pr-${{ github.event.number }}-${{ github.sha }}
+          path: dist/*.zip
+          retention-days: 14
