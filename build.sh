@@ -57,9 +57,16 @@ fi
 
 mkdir -p addons/sourcemod/plugins
 
+# Strict mode: -E warnings-as-errors (PR/release CI uses STRICT=1)
+STRICT_FLAGS=()
+if [[ "${STRICT:-0}" == "1" ]]; then
+  STRICT_FLAGS=(-E)
+fi
+
 "$SPCOMP" addons/sourcemod/scripting/stratosphere.sp \
   "${INC_PATHS[@]}" \
   -i="$SM_DIR/addons/sourcemod/scripting/include" \
+  "${STRICT_FLAGS[@]}" \
   -o=addons/sourcemod/plugins/stratosphere.smx
 
 echo "OK: addons/sourcemod/plugins/stratosphere.smx"
