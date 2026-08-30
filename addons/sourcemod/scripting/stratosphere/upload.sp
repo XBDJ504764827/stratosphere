@@ -19,6 +19,12 @@
 
 void ST_UploadFile(const char[] stagingPath, const char[] gokzMode, const char[] map, const char[] typeStr, int timeMs, const char[] cacheKey)
 {
+	ST_UploadFileEx(stagingPath, "0", 0, gokzMode, "NRM", map, typeStr, timeMs, cacheKey);
+}
+
+// 新结构 5 段上传：额外携带 steamId/course/style
+void ST_UploadFileEx(const char[] stagingPath, const char[] steamId, int course, const char[] gokzMode, const char[] style, const char[] map, const char[] typeStr, int timeMs, const char[] cacheKey)
+{
 	char url[ST_MAX_URL_LENGTH];
 	gCV_URL.GetString(url, sizeof(url));
 	if (url[0] == '\0')
@@ -49,8 +55,16 @@ void ST_UploadFile(const char[] stagingPath, const char[] gokzMode, const char[]
 	SteamWorks_SetHTTPRequestAbsoluteTimeoutMS(hRequest, ST_HTTP_TIMEOUT * 1000);
 	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-API-Key", apiKey);
 	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-GOKZ-Mode", gokzMode);
+	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-Mode", gokzMode);
 	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-Map", map);
 	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-Route", typeStr);
+	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-Type", typeStr);
+
+	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-SteamId", steamId);
+	char courseStr[8];
+	IntToString(course, courseStr, sizeof(courseStr));
+	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-Course", courseStr);
+	SteamWorks_SetHTTPRequestHeaderValue(hRequest, "X-Style", style);
 
 	char timeMsStr[16];
 	IntToString(timeMs, timeMsStr, sizeof(timeMsStr));
@@ -77,8 +91,13 @@ void ST_UploadFile(const char[] stagingPath, const char[] gokzMode, const char[]
 
 	if (gCV_Debug.BoolValue)
 	{
-		LogMessage("[stratosphere] Uploading -> wr/%s/%s/%s.replay (timeMs=%d, apiKey=%s)",
-			gokzMode, map, typeStr, timeMs, apiKey[0] == '\0' ? "NOT_SET" : "set");
+		// 新结构日志：wr/{map}/{steamId}_{course}_{mode}_{style}_{type}.replay
+		char modeUpper[8], typeUpper[8], styleUpper[16];
+		strcopy(modeUpper, sizeof(modeUpper), gokzMode); ST_ToUpper(modeUpper, sizeof(modeUpper));
+		strcopy(typeUpper, sizeof(typeUpper), typeStr); ST_ToUpper(typeUpper, sizeof(typeUpper));
+		strcopy(styleUpper, sizeof(styleUpper), style); ST_ToUpper(styleUpper, sizeof(styleUpper));
+		LogMessage("[stratosphere] Uploading -> wr/%s/%s_%d_%s_%s_%s.replay (timeMs=%d, apiKey=%s)",
+			map, steamId, course, modeUpper, styleUpper, typeUpper, timeMs, apiKey[0] == '\0' ? "NOT_SET" : "set");
 	}
 
 	if (!SteamWorks_SendHTTPRequest(hRequest))
