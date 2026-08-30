@@ -9,6 +9,7 @@ permissions:
 on:
   pull_request:
     branches: [ master, main ]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
@@ -21,6 +22,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="$(grep -E '#define ST_VERSION' addons/sourcemod/scripting/stratosphere.sp | sed -E 's/.*\"([^\"]+)\".*/\1/')"
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          SHORT="$(echo "$GITHUB_SHA" | cut -c1-7)"
+          echo "short=$SHORT" >> "$GITHUB_OUTPUT"
+          PRNUM="${{ github.event.number }}"
+          if [ -z "$PRNUM" ]; then PRNUM="${{ github.run_number }}"; fi
+          echo "prnum=$PRNUM" >> "$GITHUB_OUTPUT"
+          echo "Version: $VER, PR: $PRNUM, Short: $SHORT"
 
       - name: Setup SourceMod 1.11
         shell: bash
@@ -63,29 +78,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VER="${{ steps.ver.outputs.ver }}"
+          SHORT="${{ steps.ver.outputs.short }}"
+          PRNUM="${{ steps.ver.outputs.prnum }}"
           PKG="package"
           rm -rf "$PKG" dist
           mkdir -p "$PKG/addons/sourcemod/plugins"
-          mkdir -p "$PKG/cfg/sourcemod/gokz"
           mkdir -p dist
           cp addons/sourcemod/plugins/stratosphere.smx "$PKG/addons/sourcemod/plugins/"
-          cp cfg/sourcemod/gokz/gokz-stratosphere.cfg "$PKG/cfg/sourcemod/gokz/"
-          # Keep directory structure so unzip to csgo/ is ready-to-use
-          (cd "$PKG" && zip -r "../dist/stratosphere-pr${{ github.event.number }}-${{ github.sha }}.zip" .)
+          ZIP="stratosphere-TEST-PR${PRNUM}-v${VER}-${SHORT}.zip"
+          echo "Zip: $ZIP"
+          (cd "$PKG" && zip -r "../dist/$ZIP" .)
           ls -lh dist/
-          unzip -l "dist/stratosphere-pr${{ github.event.number }}-${{ github.sha }}.zip"
+          unzip -l "dist/$ZIP"
 
       - name: Upload PR artifact (smx)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stratosphere-pr-${{ github.event.number }}-${{ github.sha }}
+          name: stratosphere-TEST-PR${{ steps.ver.outputs.prnum }}-v${{ steps.ver.outputs.ver }}-${{ steps.ver.outputs.short }}
           path: |
             addons/sourcemod/plugins/stratosphere.smx
           retention-days: 14
+          if-no-files-found: warn
 
       - name: Upload PR artifact (full zip)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stratosphere-full-pr-${{ github.event.number }}-${{ github.sha }}
+          name: stratosphere-TEST-full-PR${{ steps.ver.outputs.prnum }}-v${{ steps.ver.outputs.ver }}-${{ steps.ver.outputs.short }}
           path: dist/*.zip
           retention-days: 14
+          if-no-files-found: warn

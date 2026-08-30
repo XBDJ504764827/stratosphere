@@ -41,12 +41,14 @@ void ST_BackfillMap(const char[] map)
 			continue;
 		}
 
+		char steamId[32];
 		int course;
 		char modeShort[8];
+		char style[16];
 		char typeStr[8];
-		if (!ST_ParseRunFileName(fileName, course, modeShort, sizeof(modeShort), typeStr, sizeof(typeStr)))
+		if (!ST_ParseRunFileNameFull(fileName, steamId, sizeof(steamId), course, modeShort, sizeof(modeShort), style, sizeof(style), typeStr, sizeof(typeStr)))
 		{
-			continue; // 非 course 0 / 命名不符合 / 未知模式
+			continue;
 		}
 
 		BuildPath(Path_SM, fullPath, sizeof(fullPath), "%s/%s", dir, fileName);
@@ -60,7 +62,7 @@ void ST_BackfillMap(const char[] map)
 		int timeMs = RoundToNearest(replayTime * 1000.0);
 
 		char cacheKey[ST_MAX_KEY_LENGTH];
-		ST_BuildCacheKey(modeShort, map, typeStr, cacheKey, sizeof(cacheKey));
+		ST_BuildCacheKeyEx("0", course, modeShort, style, typeStr, map, cacheKey, sizeof(cacheKey));
 
 		char cached[32];
 		ST_CacheRead(cacheKey, cached, sizeof(cached));
@@ -68,7 +70,7 @@ void ST_BackfillMap(const char[] map)
 		IntToString(timeMs, timeStr, sizeof(timeStr));
 		if (StrEqual(cached, timeStr))
 		{
-			continue; // 已上传且纪录未变化
+			continue;
 		}
 
 		if (!ST_StageFile(fullPath, cacheKey, stagingPath, sizeof(stagingPath)))
@@ -79,10 +81,14 @@ void ST_BackfillMap(const char[] map)
 
 		if (gCV_Debug.BoolValue)
 		{
-			LogMessage("[stratosphere] Backfill -> wr/%s/%s/%s.replay (timeMs=%d)", modeShort, map, typeStr, timeMs);
+			char modeUpper[8], styleUpper[16], typeUpper[8];
+			strcopy(modeUpper, sizeof(modeUpper), modeShort); ST_ToUpper(modeUpper, sizeof(modeUpper));
+			strcopy(typeUpper, sizeof(typeUpper), typeStr); ST_ToUpper(typeUpper, sizeof(typeUpper));
+			strcopy(styleUpper, sizeof(styleUpper), style); ST_ToUpper(styleUpper, sizeof(styleUpper));
+			LogMessage("[stratosphere] Backfill -> wr/%s/0_%d_%s_%s_%s.replay (timeMs=%d)", map, course, modeUpper, styleUpper, typeUpper, timeMs);
 		}
 
-		ST_UploadFile(stagingPath, modeShort, map, typeStr, timeMs, cacheKey);
+		ST_UploadFileEx(stagingPath, "0", course, modeShort, style, map, typeStr, timeMs, cacheKey);
 	}
 	delete listing;
 }

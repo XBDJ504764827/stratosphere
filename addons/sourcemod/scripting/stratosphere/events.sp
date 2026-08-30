@@ -17,10 +17,12 @@ void ST_OnRecordSaved(const char[] map, float time, const char[] filePath)
 	char fileName[PLATFORM_MAX_PATH];
 	ST_GetFileName(filePath, fileName, sizeof(fileName));
 
+	char steamId[32];
 	int course;
 	char modeShort[8];
+	char style[16];
 	char typeStr[8];
-	if (!ST_ParseRunFileName(fileName, course, modeShort, sizeof(modeShort), typeStr, sizeof(typeStr)))
+	if (!ST_ParseRunFileNameFull(fileName, steamId, sizeof(steamId), course, modeShort, sizeof(modeShort), style, sizeof(style), typeStr, sizeof(typeStr)))
 	{
 		return;
 	}
@@ -29,12 +31,12 @@ void ST_OnRecordSaved(const char[] map, float time, const char[] filePath)
 	strcopy(mapLower, sizeof(mapLower), map);
 	ST_ToLower(mapLower, sizeof(mapLower));
 
+	// WR 统一 steamId=0（通用最快纪录），本地文件名中的 steamId 仅用于回填去重时保留
 	char cacheKey[ST_MAX_KEY_LENGTH];
-	ST_BuildCacheKey(modeShort, mapLower, typeStr, cacheKey, sizeof(cacheKey));
+	ST_BuildCacheKeyEx("0", course, modeShort, style, typeStr, mapLower, cacheKey, sizeof(cacheKey));
 
 	int timeMs = RoundToNearest(time * 1000.0);
 
-	// 同步复制到暂存目录，避免异步上传期间同组合新纪录覆盖源文件
 	char stagingPath[PLATFORM_MAX_PATH];
 	if (!ST_StageFile(filePath, cacheKey, stagingPath, sizeof(stagingPath)))
 	{
@@ -44,8 +46,12 @@ void ST_OnRecordSaved(const char[] map, float time, const char[] filePath)
 
 	if (gCV_Debug.BoolValue)
 	{
-		LogMessage("[stratosphere] New record -> wr/%s/%s/%s.replay (timeMs=%d)", modeShort, mapLower, typeStr, timeMs);
+		char modeUpper[8], styleUpper[16], typeUpper[8];
+		strcopy(modeUpper, sizeof(modeUpper), modeShort); ST_ToUpper(modeUpper, sizeof(modeUpper));
+		strcopy(typeUpper, sizeof(typeUpper), typeStr); ST_ToUpper(typeUpper, sizeof(typeUpper));
+		strcopy(styleUpper, sizeof(styleUpper), style); ST_ToUpper(styleUpper, sizeof(styleUpper));
+		LogMessage("[stratosphere] New record -> wr/%s/0_%d_%s_%s_%s.replay (timeMs=%d)", mapLower, course, modeUpper, styleUpper, typeUpper, timeMs);
 	}
 
-	ST_UploadFile(stagingPath, modeShort, mapLower, typeStr, timeMs, cacheKey);
+	ST_UploadFileEx(stagingPath, "0", course, modeShort, style, mapLower, typeStr, timeMs, cacheKey);
 }

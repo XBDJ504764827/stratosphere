@@ -4,12 +4,15 @@
 	CS:GO GOKZ 录像上传插件：把服务器上每张地图的最快录像（服务器纪录 WR）
 	上传到 Cloudflare R2（通过 Worker 中转），供 wayfinder 寻路插件下载绘制路线。
 
-	【键名约定（与 wayfinder 完全对齐）】
-	  wr/<vnl|skz|kzt>/<地图名>/<tp|pro>.replay
-	  例如 wr/skz/kz_bhop_easy/pro.replay
+	【键名约定（新结构 5 段，与 guideline 完全对齐）】
+	  wr/<地图名>/0_0_<KZT|SKZ|VNL>_NRM_<PRO|NUB>.replay
+	  例如 wr/kz_bhop_easy/0_0_SKZ_NRM_PRO.replay
+	       wr/kz_bhop_easy/365313220_0_SKZ_NRM_NUB.replay  ← 本地文件名 5 段，R2 键名统一 steamId=0
+	  - 本地文件名 5 段: <steamId>_<course>_<MODE>_<STYLE>_<TIMETYPE>.replay 兼容旧 4 段
+	  - R2 键名 5 段: wr/{map}/0_{course}_{MODE}_{STYLE}_{TYPE}.replay (steamId 固定 0 为 WR)
 	  - 只处理 course 0（主图）；bonus 录像忽略
-	  - tp = 存点（有 TP）最快录像，pro = 不存点（无 TP）最快录像
-	  - 每个 (模式, 地图, 类型) 只有一个键；多服务器共用 bucket 时由 Worker
+	  - NUB = 存点（有 TP，旧 tp 映射为 NUB），PRO = 不存点（无 TP）
+	  - 每个 (地图, 模式, 风格, 类型) 只有一个键；多服务器共用 bucket 时由 Worker
 	    按 time_ms 做"最快者胜"，慢纪录不会覆盖快纪录
 
 	【上传触发】
@@ -26,15 +29,19 @@
 	  但同组合的新纪录会覆盖旧文件。为避免异步上传读到半截文件，上传前
 	  先把录像同步复制到暂存目录（data/gokz-stratosphere/staging/）再从副本上传。
 
-	【Worker 协议】
+	【Worker 协议（新结构 5 段）】
 	  POST {gokz_stratosphere_url}
 	  Headers:
 	      X-API-Key:    <gokz_stratosphere_key>
-	      X-GOKZ-Mode:  vnl|skz|kzt
 	      X-Map:        <地图名>
-	      X-Route:      tp|pro
+	      X-Mode/X-GOKZ-Mode: KZT|SKZ|VNL (兼容 vnl/0/1/2)
+	      X-Type/X-Route: PRO|NUB (兼容 pro/tp)
+	      X-SteamId:    0 (固定 WR，兼容本地 365313220 等)
+	      X-Course:     0
+	      X-Style:      NRM
 	      X-Time-Ms:    <成绩毫秒>
 	      X-Timestamp:  <unix 秒>
+	  R2 键: wr/{map}/0_0_{MODE}_{STYLE}_{TYPE}.replay  例 wr/kz_bhop_easy/0_0_KZT_NRM_PRO.replay
 	  Body: .replay 文件二进制
 	  响应 JSON: { success, stored, reason, path, time_ms, sha256, size }
 	  （Worker 已实现最快者胜：stored=false 表示 R2 已有相同或更快的录像）
@@ -62,7 +69,7 @@
 #pragma newdecls required
 #pragma semicolon 1
 
-#define ST_VERSION "1.0.1"
+#define ST_VERSION "1.0.0"
 
 public Plugin myinfo =
 {

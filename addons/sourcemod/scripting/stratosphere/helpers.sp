@@ -32,6 +32,18 @@ void ST_ToLower(char[] buffer, int maxlength)
 	}
 }
 
+// 原地转大写
+void ST_ToUpper(char[] buffer, int maxlength)
+{
+	for (int i = 0; buffer[i] != '\0' && i < maxlength; i++)
+	{
+		if (buffer[i] >= 'a' && buffer[i] <= 'z')
+		{
+			buffer[i] = view_as<char>(buffer[i] - 32);
+		}
+	}
+}
+
 // 取路径中的文件名（去掉目录部分）
 void ST_GetFileName(const char[] path, char[] output, int maxlength)
 {
@@ -73,27 +85,46 @@ void ST_SanitizeForFile(const char[] input, char[] output, int maxlength)
 	output[outPos] = '\0';
 }
 
-// 构建缓存键：<模式>_<地图>_<类型>，例如 skz_kz_bhop_easy_pro
-void ST_BuildCacheKey(const char[] modeShort, const char[] map, const char[] typeStr, char[] output, int maxlength)
+// 构建缓存键（新结构 5 段）：<steamId>_<course>_<模式>_<风格>_<类型>_<地图>
+// 例: 0_0_kzt_nrm_pro_kz_bhop_easy  对应 R2 键 wr/kz_bhop_easy/0_0_KZT_NRM_PRO.replay
+void ST_BuildCacheKeyEx(const char[] steamId, int course, const char[] modeShort, const char[] style, const char[] typeStr, const char[] map, char[] output, int maxlength)
 {
 	char safeMap[64];
 	ST_SanitizeForFile(map, safeMap, sizeof(safeMap));
-	Format(output, maxlength, "%s_%s_%s", modeShort, safeMap, typeStr);
+	char safeSteamId[32];
+	ST_SanitizeForFile(steamId, safeSteamId, sizeof(safeSteamId));
+	char safeMode[8], safeStyle[16], safeType[8];
+	strcopy(safeMode, sizeof(safeMode), modeShort);
+	ST_ToLower(safeMode, sizeof(safeMode));
+	strcopy(safeStyle, sizeof(safeStyle), style);
+	ST_ToLower(safeStyle, sizeof(safeStyle));
+	strcopy(safeType, sizeof(safeType), typeStr);
+	ST_ToLower(safeType, sizeof(safeType));
+	Format(output, maxlength, "%s_%d_%s_%s_%s_%s", safeSteamId, course, safeMode, safeStyle, safeType, safeMap);
+}
+
+// 旧接口兼容：默认 steamId=0 course=0 style=NRM（WR 通用键）
+#pragma unused ST_BuildCacheKey
+void ST_BuildCacheKey(const char[] modeShort, const char[] map, const char[] typeStr, char[] output, int maxlength)
+{
+	ST_BuildCacheKeyEx("0", 0, modeShort, "NRM", typeStr, map, output, maxlength);
 }
 
 
 
 // =====[ REPLAY FILE NAME ]=====
 
-// 解析 GOKZ 永久录像文件名：<course>_<MODE>_<STYLE>_<TIMETYPE>.replay
-// 例：0_SKZ_NRM_PRO.replay -> course=0, modeShort="skz", typeStr="pro"
+// 解析 GOKZ 永久录像文件名
+// 支持两种格式：
+//  4 段: <course>_<MODE>_<STYLE>_<TIMETYPE>.replay  例: 0_SKZ_NRM_PRO.replay
+//  5 段: <steamId>_<course>_<MODE>_<STYLE>_<TIMETYPE>.replay 例: 0_0_KZT_NRM_NUB.replay / 365313220_0_SKZ_NRM_NUB.replay
 // 只认 course 0、合法模式（vnl/skz/kzt）；NUB 及未知时间类型一律按 tp。
+#pragma unused ST_ParseRunFileName
 bool ST_ParseRunFileName(const char[] fileName, int &course, char[] modeShort, int modeShortLen, char[] typeStr, int typeStrLen)
 {
 	char buf[PLATFORM_MAX_PATH];
 	strcopy(buf, sizeof(buf), fileName);
 
-	// 去掉扩展名
 	int dot = StrContains(buf, ".replay");
 	if (dot == -1)
 	{
@@ -101,27 +132,47 @@ bool ST_ParseRunFileName(const char[] fileName, int &course, char[] modeShort, i
 	}
 	buf[dot] = '\0';
 
-	// 按 '_' 切 4 段
-	char parts[4][16];
+	char parts[5][16];
 	int n = ExplodeString(buf, "_", parts, sizeof(parts), sizeof(parts[]));
+	if (n == 5)
+	{
+		// 5 段含 steamId 前缀
+		course = StringToInt(parts[1]);
+		if (course != 0)
+		{
+			return false;
+		}
+		strcopy(modeShort, modeShortLen, parts[2]);
+		ST_ToLower(modeShort, modeShortLen);
+		if (!StrEqual(modeShort, "vnl") && !StrEqual(modeShort, "skz") && !StrEqual(modeShort, "kzt"))
+		{
+			return false;
+		}
+		if (StrEqual(parts[4], "PRO", false))
+		{
+			strcopy(typeStr, typeStrLen, "pro");
+		}
+		else
+		{
+			strcopy(typeStr, typeStrLen, "tp");
+		}
+		return true;
+	}
 	if (n < 4)
 	{
 		return false;
 	}
-
 	course = StringToInt(parts[0]);
 	if (course != 0)
 	{
-		return false; // 只处理主图
+		return false;
 	}
-
 	strcopy(modeShort, modeShortLen, parts[1]);
 	ST_ToLower(modeShort, modeShortLen);
 	if (!StrEqual(modeShort, "vnl") && !StrEqual(modeShort, "skz") && !StrEqual(modeShort, "kzt"))
 	{
 		return false;
 	}
-
 	if (StrEqual(parts[3], "PRO", false))
 	{
 		strcopy(typeStr, typeStrLen, "pro");
@@ -130,6 +181,47 @@ bool ST_ParseRunFileName(const char[] fileName, int &course, char[] modeShort, i
 	{
 		strcopy(typeStr, typeStrLen, "tp");
 	}
+	return true;
+}
+
+// 完整解析（5 段新结构）：返回 steamId/course/mode/style/type
+bool ST_ParseRunFileNameFull(const char[] fileName, char[] steamId, int steamIdLen, int &course, char[] modeShort, int modeShortLen, char[] style, int styleLen, char[] typeStr, int typeStrLen)
+{
+	char buf[PLATFORM_MAX_PATH];
+	strcopy(buf, sizeof(buf), fileName);
+	int dot = StrContains(buf, ".replay");
+	if (dot == -1)
+	{
+		return false;
+	}
+	buf[dot] = '\0';
+	char parts[5][16];
+	int n = ExplodeString(buf, "_", parts, sizeof(parts), sizeof(parts[]));
+	if (n == 5)
+	{
+		strcopy(steamId, steamIdLen, parts[0]);
+		course = StringToInt(parts[1]);
+		if (course != 0) return false;
+		strcopy(modeShort, modeShortLen, parts[2]);
+		ST_ToLower(modeShort, modeShortLen);
+		if (!StrEqual(modeShort, "vnl") && !StrEqual(modeShort, "skz") && !StrEqual(modeShort, "kzt")) return false;
+		strcopy(style, styleLen, parts[3]);
+		ST_ToLower(style, styleLen);
+		if (StrEqual(parts[4], "PRO", false)) strcopy(typeStr, typeStrLen, "pro");
+		else strcopy(typeStr, typeStrLen, "tp");
+		return true;
+	}
+	if (n < 4) return false;
+	strcopy(steamId, steamIdLen, "0");
+	course = StringToInt(parts[0]);
+	if (course != 0) return false;
+	strcopy(modeShort, modeShortLen, parts[1]);
+	ST_ToLower(modeShort, modeShortLen);
+	if (!StrEqual(modeShort, "vnl") && !StrEqual(modeShort, "skz") && !StrEqual(modeShort, "kzt")) return false;
+	strcopy(style, styleLen, parts[2]);
+	ST_ToLower(style, styleLen);
+	if (StrEqual(parts[3], "PRO", false)) strcopy(typeStr, typeStrLen, "pro");
+	else strcopy(typeStr, typeStrLen, "tp");
 	return true;
 }
 
