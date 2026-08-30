@@ -17,6 +17,7 @@
 
 // =====[ PUBLIC ]=====
 
+#pragma unused ST_UploadFile
 void ST_UploadFile(const char[] stagingPath, const char[] gokzMode, const char[] map, const char[] typeStr, int timeMs, const char[] cacheKey)
 {
 	ST_UploadFileEx(stagingPath, "0", 0, gokzMode, "NRM", map, typeStr, timeMs, cacheKey);

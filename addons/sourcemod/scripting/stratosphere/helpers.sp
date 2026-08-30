@@ -104,6 +104,7 @@ void ST_BuildCacheKeyEx(const char[] steamId, int course, const char[] modeShort
 }
 
 // 旧接口兼容：默认 steamId=0 course=0 style=NRM（WR 通用键）
+#pragma unused ST_BuildCacheKey
 void ST_BuildCacheKey(const char[] modeShort, const char[] map, const char[] typeStr, char[] output, int maxlength)
 {
 	ST_BuildCacheKeyEx("0", 0, modeShort, "NRM", typeStr, map, output, maxlength);
@@ -118,6 +119,7 @@ void ST_BuildCacheKey(const char[] modeShort, const char[] map, const char[] typ
 //  4 段: <course>_<MODE>_<STYLE>_<TIMETYPE>.replay  例: 0_SKZ_NRM_PRO.replay
 //  5 段: <steamId>_<course>_<MODE>_<STYLE>_<TIMETYPE>.replay 例: 0_0_KZT_NRM_NUB.replay / 365313220_0_SKZ_NRM_NUB.replay
 // 只认 course 0、合法模式（vnl/skz/kzt）；NUB 及未知时间类型一律按 tp。
+#pragma unused ST_ParseRunFileName
 bool ST_ParseRunFileName(const char[] fileName, int &course, char[] modeShort, int modeShortLen, char[] typeStr, int typeStrLen)
 {
 	char buf[PLATFORM_MAX_PATH];
